@@ -34,7 +34,10 @@ if (fs.existsSync(ziggyRoutesPath)) {
 
 async function runLoadTest() {
   const requests = Array.from({ length: 10 }, (_, i) => {
-    const targetUrl = `http://localhost/chat/${i + 1}`
+    const targetId = i + 1
+    const targetUrl = `/chat/${targetId}`
+    const fullLocationUrl = `http://localhost/chat/${targetId}`
+
     const payload = JSON.stringify({
       component: 'Chat/Index',
       props: {
@@ -44,7 +47,7 @@ async function runLoadTest() {
         ],
         ziggy: {
           ...ziggyConfig,
-          location: targetUrl,
+          location: fullLocationUrl,
         },
       },
       url: targetUrl,
@@ -67,8 +70,29 @@ async function runLoadTest() {
           res.on('end', () => {
             try {
               const json = JSON.parse(data)
-              resolve({ targetUrl, json })
+              const bodyHtml = json.body || ''
+
+              let renderedUrl = null
+              let renderedZiggyLocation = null
+
+              // Extract Inertia page JSON from <script data-page="app" type="application/json">...</script>
+              const scriptMatch = bodyHtml.match(/<script data-page="app" type="application\/json">(.*?)<\/script>/s)
+              if (scriptMatch && scriptMatch[1]) {
+                const parsed = JSON.parse(scriptMatch[1])
+                renderedUrl = parsed.url
+                renderedZiggyLocation = parsed.props?.ziggy?.location
+              }
+
+              resolve({
+                reqId: targetId,
+                requestedUrl: targetUrl,
+                requestedLocation: fullLocationUrl,
+                renderedUrl,
+                renderedZiggyLocation,
+                bodyHtml,
+              })
             } catch (err) {
+              console.error('Raw response data error:', err)
               reject(err)
             }
           })
@@ -81,21 +105,31 @@ async function runLoadTest() {
   })
 
   const results = await Promise.all(requests)
-  console.log('\n=================== SSR LOAD TEST GATE RESULTS ===================')
+
+  console.log('\n========================================================================================================')
+  console.log('                        SSR CONCURRENCY RACE CONDITION VERIFICATION (10 REQUESTS)')
+  console.log('========================================================================================================')
+
   let mismatches = 0
-  results.forEach(({ targetUrl, json }, idx) => {
-    const bodyStr = json.body || ''
-    const ok = bodyStr.length > 0
-    if (!ok) mismatches++
-    console.log(`[Req ${idx + 1}] Target: ${targetUrl} | Status: ${ok ? 'PASS' : 'FAIL'} | Rendered Body: ${bodyStr.length} chars`)
+  results.forEach(res => {
+    const isUrlMatch = res.renderedUrl === res.requestedUrl
+    const isLocationMatch = res.renderedZiggyLocation === res.requestedLocation
+    const pass = isUrlMatch && isLocationMatch
+
+    if (!pass) mismatches++
+
+    console.log(`[Req #${String(res.reqId).padStart(2)}] Requested: ${res.requestedUrl.padEnd(10)} | Rendered URL: ${(res.renderedUrl || 'NULL').padEnd(10)} | Ziggy.location: ${(res.renderedZiggyLocation || 'NULL').padEnd(28)} | ${pass ? '✅ PASS' : '❌ RACE MISMATCH'}`)
   })
-  console.log(`------------------------------------------------------------------`)
+
+  console.log('--------------------------------------------------------------------------------------------------------')
   console.log(`Total Concurrent Requests: ${results.length}`)
-  console.log(`Total Mismatches / Failures: ${mismatches}`)
+  console.log(`Total Race Condition Mismatches: ${mismatches}`)
   if (mismatches === 0) {
-    console.log('RESULT: PASSED — 100% of concurrent SSR renders completed with zero errors/mismatches!')
+    console.log('FINAL RESULT: ✅ PASSED — Every request received its exact matching Ziggy.location and URL with ZERO interleave/race condition!')
+  } else {
+    console.log('FINAL RESULT: ❌ FAILED — Race condition detected between concurrent SSR requests!')
   }
-  console.log('==================================================================\n')
+  console.log('========================================================================================================\n')
 }
 
 runLoadTest().catch(console.error)
