@@ -12,8 +12,8 @@
 
     /* Language and Environment */
     "target": "ESNext" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
-    "jsx": "preserve" /* Specify what JSX code is generated. */,
-    "jsxImportSource": "vue" /* Specify module specifier used to import the JSX factory functions when using 'jsx: react-jsx*'. */,
+    "jsx": "react-jsx" /* Specify what JSX code is generated. */,
+    "jsxImportSource": "react" /* Specify module specifier used to import the JSX factory functions when using 'jsx: react-jsx*'. */,
     "lib": [
       "ESNext",
       "DOM",
@@ -50,7 +50,6 @@
     // "typeRoots": [],                                  /* Specify multiple folders that act like './node_modules/@types'. */
     "types": [
       "vite/client",
-      "vue/tsx",
       "./resources/js/types"
     ] /* Specify type package names to be included without being referenced in a source file. */,
     // "allowArbitraryExtensions": true,                 /* Enable importing files with any extension, provided a declaration file is present. */
@@ -122,7 +121,6 @@
   "include": [
     "resources/js/**/*.ts",
     "resources/js/**/*.d.ts",
-    "resources/js/**/*.tsx",
-    "resources/js/**/*.vue"
+    "resources/js/**/*.tsx"
   ]
 }

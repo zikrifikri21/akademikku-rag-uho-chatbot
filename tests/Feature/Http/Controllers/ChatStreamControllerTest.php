@@ -34,7 +34,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'Hello',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -64,7 +64,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'Explain quantum computing',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -86,7 +86,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'This might cause an error',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -124,7 +124,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'Complex multi-step question',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -157,7 +157,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'Complex analytical question',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -185,7 +185,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'What is the weather like?',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -214,7 +214,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'Test message',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -324,7 +324,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => '  Hello with spaces  ',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -369,7 +369,7 @@ describe('ChatStreamController', function (): void {
 
         $response = $this->post(route('chat.stream', $this->chat), [
             'message' => 'Test',
-            'model' => ModelName::GPT_5_MINI->value,
+            'model' => ModelName::GPT_OSS_20B->value,
         ]);
 
         $response->assertOk();
@@ -380,7 +380,7 @@ describe('ChatStreamController', function (): void {
 
         $fake->assertCallCount(1);
         $fake->assertRequest(function (array $requests): true {
-            expect($requests[0]->model())->toBe('gpt-5-mini');
+            expect($requests[0]->model())->toBe('openai/gpt-oss-20b');
 
             return true;
         });
