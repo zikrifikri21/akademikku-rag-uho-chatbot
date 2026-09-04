@@ -1,42 +1,74 @@
-/.phpunit.cache
-/bootstrap/ssr
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
+# Environment files
 .env
-.env.backup
-.env.production
-.phpactor.json
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
+.env.*
+!.env.example
+
+# Node / JS
+node_modules/
+**/node_modules/
+public/build
+public/hot
+public/storage
+**/public/build
+**/public/hot
+**/public/storage
 npm-debug.log
 yarn-error.log
-/auth.json
-/.fleet
-/.idea
-/.nova
-/.vscode
-/.zed
+bun.lockb
 
-**/caddy
-frankenphp
-frankenphp-worker.php
+# PHP / Laravel
+vendor/
+**/vendor/
+bootstrap/ssr
+**/bootstrap/ssr
+storage/*.key
+storage/pail
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+**/storage/*.key
+**/storage/pail
+**/storage/logs/*
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+.phpunit.cache
+.phpunit.result.cache
 
-**/.DS_Store
-/.mcp.json
+# Python / FastAPI / RAG
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+**/.venv/
+**/venv/
+**/env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
 
-.claude
-.cursor
-.junie
-.gemini
-.vscode/mcp.json
-CLAUDE.md
-AGENTS.md
-GEMINI.md
-opencode.json
-boost.json
+# Chroma Vector Store DB (large binary files)
+chroma_db_uho/
+**/chroma_db_uho/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# AI / IDE specific scratch & agents
+.gemini/
+.claude/
+.cursor/
+.agents/
+scratch/
+**/scratch/
