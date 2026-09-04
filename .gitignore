@@ -65,10 +65,23 @@ Thumbs.db
 *.swp
 *.swo
 
-# AI / IDE specific scratch & agents
+# AI / IDE specific configs & scratch
 .gemini/
 .claude/
 .cursor/
 .agents/
+.junie/
+.mcp.json
+**/.mcp.json
+CLAUDE.md
+**/CLAUDE.md
+AGENTS.md
+**/AGENTS.md
+GEMINI.md
+**/GEMINI.md
+opencode.json
+**/opencode.json
+boost.json
+**/boost.json
 scratch/
 **/scratch/
