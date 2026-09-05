@@ -16,6 +16,7 @@ interface ChatHeaderProps {
   selectedModelId: string
   selectedVisibilityType: Visibility
   isReadonly: boolean
+  isGuest?: boolean
 }
 
 export function ChatHeader({
@@ -23,13 +24,27 @@ export function ChatHeader({
   selectedModelId,
   selectedVisibilityType,
   isReadonly,
+  isGuest = false,
 }: ChatHeaderProps) {
   function handleNewChat() {
     router.visit(route('chats.index'))
   }
 
+  function handleVisibilityChange(newVisibility: Visibility) {
+    // Only persist if this is an existing chat (has a chatId)
+    if (!chatId) return
+    router.patch(
+      route('chats.update', { chat: chatId }),
+      { visibility: newVisibility },
+      { preserveScroll: true, preserveState: true },
+    )
+  }
+
   return (
-    <VisibilityProvider initialVisibility={selectedVisibilityType}>
+    <VisibilityProvider
+      initialVisibility={selectedVisibilityType}
+      onVisibilityChange={handleVisibilityChange}
+    >
       <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2 z-10">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -49,7 +64,7 @@ export function ChatHeader({
           <ModelSelector className="order-1 md:order-2" />
         )}
 
-        {!isReadonly && (
+        {!isReadonly && !isGuest && (
           <VisibilitySelector className="order-1 md:order-3" />
         )}
       </header>

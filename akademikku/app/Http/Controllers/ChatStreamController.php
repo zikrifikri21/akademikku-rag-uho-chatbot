@@ -7,17 +7,13 @@ namespace App\Http\Controllers;
 use Generator;
 use Throwable;
 use App\Models\Chat;
-use Prism\Prism\Prism;
 use App\Models\Message;
 use App\Enums\ModelName;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use App\Http\Requests\ChatStreamRequest;
 use Illuminate\Support\Facades\Response;
-use Prism\Prism\Streaming\Events\ThinkingEvent;
-use Prism\Prism\Streaming\Events\TextDeltaEvent;
-use Prism\Prism\ValueObjects\Messages\UserMessage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 
 final class ChatStreamController extends Controller
 {
@@ -25,6 +21,8 @@ final class ChatStreamController extends Controller
     {
         $userMessage = $request->string('message')->trim()->value();
         $model = $request->enum('model', ModelName::class, ModelName::GPT_OSS_20B);
+
+        $historyPayload = $this->buildConversationHistory($chat);
 
         $chat->messages()->create([
             'role' => 'user',
@@ -34,47 +32,50 @@ final class ChatStreamController extends Controller
             'attachments' => '[]',
         ]);
 
-        $messages = $this->buildConversationHistory($chat);
-
-        return Response::stream(function () use ($chat, $messages, $model): Generator {
+        return Response::stream(function () use ($chat, $userMessage, $model, $historyPayload): Generator {
             $parts = [
                 'text' => '',
                 'thinking' => '',
             ];
 
             try {
-                $response = Prism::text()
-                    ->withSystemPrompt(view('prompts.system'))
-                    ->using($model->getProvider(), $model->value)
-                    ->withMessages($messages)
-                    ->asStream();
+                $response = Http::withHeaders([
+                        'X-Internal-Api-Key' => config('services.rag_api.key'),
+                    ])
+                    ->timeout(0)
+                    ->withOptions(['stream' => true])
+                    ->post(config('services.rag_api.url').'/api/rag/stream', [
+                        'message' => $userMessage,
+                        'model' => $model->value,
+                        'history' => $historyPayload,
+                    ]);
 
-                foreach ($response as $event) {
-                    $eventData = match ($event::class) {
-                        TextDeltaEvent::class => [
-                            'eventType' => 'text_delta',
-                            'content' => $event->delta,
-                        ],
-                        ThinkingEvent::class => [
-                            'eventType' => 'thinking',
-                            'content' => $event->delta,
-                        ],
-                        default => null,
-                    };
+                $body = $response->toPsrResponse()->getBody();
+                $buffer = '';
 
-                    if ($eventData === null) {
-                        continue;
+                while (! $body->eof()) {
+                    $buffer .= $body->read(1024);
+                    while (($pos = strpos($buffer, "\n")) !== false) {
+                        $line = substr($buffer, 0, $pos);
+                        $buffer = substr($buffer, $pos + 1);
+                        if ($line === '') {
+                            continue;
+                        }
+
+                        $decoded = json_decode($line, true);
+                        if (is_array($decoded)) {
+                            if (($decoded['eventType'] ?? null) === 'text_delta') {
+                                $parts['text'] .= $decoded['content'] ?? '';
+                            } elseif (($decoded['eventType'] ?? null) === 'thinking') {
+                                $content = (string) ($decoded['content'] ?? '');
+                                if (! str_contains($content, 'Sedang mencari dokumen') && ! str_contains($content, 'Mencari dokumen')) {
+                                    $parts['thinking'] .= $content;
+                                }
+                            }
+                        }
+
+                        yield $line."\n";
                     }
-
-                    if ($event instanceof TextDeltaEvent) {
-                        $parts['text'] .= $event->delta;
-                    }
-
-                    if ($event instanceof ThinkingEvent) {
-                        $parts['thinking'] .= $event->delta;
-                    }
-
-                    yield json_encode($eventData)."\n";
                 }
 
                 if ($parts['text'] !== '' || $parts['thinking'] !== '') {
@@ -101,10 +102,11 @@ final class ChatStreamController extends Controller
         return $chat->messages()
             ->orderBy('created_at')
             ->get()
-            ->map(fn (Message $message): UserMessage|AssistantMessage => match ($message->role) {
-                'user' => new UserMessage(content: $message->parts['text'] ?? ''),
-                'assistant' => new AssistantMessage(content: $message->parts['text'] ?? ''),
-            })
+            ->map(fn (Message $message): array => [
+                'role' => $message->role === 'assistant' ? 'assistant' : 'user',
+                'content' => $message->parts['text'] ?? '',
+            ])
             ->toArray();
     }
 }
+

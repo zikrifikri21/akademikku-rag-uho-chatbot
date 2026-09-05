@@ -89,7 +89,7 @@ final class ChatController extends Controller
             $chat->update($updates);
         }
 
-        return to_route('chats.show', ['chat' => $chat]);
+        return back();
     }
 
     public function destroy(Chat $chat): RedirectResponse

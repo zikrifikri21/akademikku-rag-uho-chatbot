@@ -6,9 +6,9 @@ export function Greeting() {
       <div className="rounded-full bg-primary/10 p-4 text-primary">
         <Icon icon="lucide:sparkles" className="size-8" />
       </div>
-      <h1 className="text-3xl font-bold tracking-tight">What can I help you with today?</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Halo! Ada yang bisa Akademikku bantu?</h1>
       <p className="text-muted-foreground text-sm max-w-md">
-        Ask anything, generate ideas, analyze code, or write creative responses.
+        Asisten AI & RAG Resmi Universitas Halu Oleo. Tanya jawab instan seputar akademik, SIAKAD, UKT, beasiswa, dan info kampus UHO.
       </p>
     </div>
   )

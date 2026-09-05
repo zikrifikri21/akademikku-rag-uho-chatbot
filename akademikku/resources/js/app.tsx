@@ -1,4 +1,4 @@
-import { createInertiaApp } from '@inertiajs/react'
+import { createInertiaApp, router } from '@inertiajs/react'
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers'
 import { createRoot } from 'react-dom/client'
 import { Toaster } from 'sonner'
@@ -10,6 +10,17 @@ import '../css/app.css'
 // Expose route() globally for client-side navigation
 // Types declared in resources/js/types/ziggy.d.ts
 ;(globalThis as any).route = route
+
+// Keep DOM CSRF token meta tag in sync after login/navigation
+router.on('navigate', (event) => {
+  const token = (event.detail.page.props as any)?.csrf_token as string | undefined
+  if (token && typeof document !== 'undefined') {
+    const meta = document.querySelector('meta[name="csrf-token"]')
+    if (meta) {
+      meta.setAttribute('content', token)
+    }
+  }
+})
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel'
 

@@ -8,28 +8,28 @@ interface SuggestedActionsProps {
 export function SuggestedActions({ onAppend }: SuggestedActionsProps) {
   const actions = [
     {
-      title: 'What are the best practices',
-      label: 'for writing clean Laravel code?',
-      action: 'What are the best practices for writing clean Laravel code?',
-      icon: 'lucide:code-2',
+      title: 'Alur Pengisian KRS SIAKAD',
+      label: 'jadwal & tata cara KRS online di SIAKAD UHO',
+      action: 'Bagaimana alur dan syarat pengisian KRS online di SIAKAD Universitas Halu Oleo?',
+      icon: 'lucide:graduation-cap',
     },
     {
-      title: 'Help me draft an email',
-      label: 'to request time off next week',
-      action: 'Help me draft a professional email to request time off next week',
-      icon: 'lucide:mail',
+      title: 'Info Beasiswa & KIP Kuliah',
+      label: 'syarat pendaftaran beasiswa mahasiswa UHO',
+      action: 'Apa saja beasiswa yang tersedia di Universitas Halu Oleo dan bagaimana syarat pendaftarannya?',
+      icon: 'lucide:award',
     },
     {
-      title: 'Explain quantum computing',
-      label: 'in simple terms with analogies',
-      action: 'Explain quantum computing in simple terms with analogies',
-      icon: 'lucide:atom',
+      title: 'Syarat & Tata Cara Cuti Kuliah',
+      label: 'prosedur permohonan cuti akademik di UHO',
+      action: 'Bagaimana prosedur dan syarat pengajuan cuti akademik bagi mahasiswa Universitas Halu Oleo?',
+      icon: 'lucide:file-text',
     },
     {
-      title: 'Design a database schema',
-      label: 'for an e-commerce platform',
-      action: 'Design a normalized database schema for an e-commerce platform',
-      icon: 'lucide:database',
+      title: 'Layanan & Jam Operasional Perpus',
+      label: 'fasilitas & syarat pinjam buku Perpus UHO',
+      action: 'Apa saja fasilitas, jam operasional, dan syarat peminjaman buku di Perpustakaan UHO?',
+      icon: 'lucide:book-open',
     },
   ]
 
@@ -39,14 +39,16 @@ export function SuggestedActions({ onAppend }: SuggestedActionsProps) {
         <Button
           key={action.title}
           variant="outline"
-          className="h-auto p-4 flex flex-col items-start justify-start text-left space-y-1 hover:border-primary/50 transition-all group"
+          className="h-auto p-4 flex flex-col items-start justify-start text-left space-y-1 hover:border-primary/50 transition-all group whitespace-normal w-full"
           onClick={() => onAppend(action.action)}
         >
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
-            <Icon icon={action.icon} className="size-4" />
-            <span>{action.title}</span>
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary w-full">
+            <Icon icon={action.icon} className="size-4 shrink-0" />
+            <span className="truncate">{action.title}</span>
           </div>
-          <span className="text-xs text-muted-foreground">{action.label}</span>
+          <span className="text-xs text-muted-foreground leading-snug w-full break-words">
+            {action.label}
+          </span>
         </Button>
       ))}
     </div>

@@ -28,7 +28,14 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from rag_engine import init_engine, ambil_konteks, get_llm, SYSTEM_PROMPT
+from rag_engine import (
+    init_engine,
+    ambil_konteks,
+    get_llm,
+    SYSTEM_PROMPT,
+    PESAN_TIDAK_TERSEDIA,
+    kontekstualisasi_pertanyaan,
+)
 from schemas import StreamRequest
 
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY")  # opsional: shared secret dengan Laravel
@@ -76,10 +83,21 @@ async def rag_stream(payload: StreamRequest, x_internal_api_key: Optional[str] =
 
     def generate():
         try:
-            konteks, sumber = ambil_konteks(payload.message, fakultas=payload.fakultas)
-
             riwayat_terpakai = payload.history[-MAX_RIWAYAT_DIPAKAI:]
-            riwayat_teks = "\n".join(f"{m.role}: {m.content}" for m in riwayat_terpakai)
+            riwayat_dict = [{"role": m.role, "content": m.content} for m in riwayat_terpakai]
+
+            pertanyaan_retrieval = kontekstualisasi_pertanyaan(payload.message, riwayat_dict)
+            print(f"[main] Query retrieval setelah kontekstualisasi: {pertanyaan_retrieval!r}")
+
+            konteks, sumber, grounded = ambil_konteks(pertanyaan_retrieval, fakultas=payload.fakultas)
+
+            if not grounded:
+                # Tidak ada bahan valid sama sekali -- jangan panggil LLM untuk menjawab bebas,
+                # supaya tidak ada celah untuk mengarang nama/fakta.
+                yield event_line("text_delta", PESAN_TIDAK_TERSEDIA)
+                return
+
+            riwayat_teks = "\n".join(f"{m['role']}: {m['content']}" for m in riwayat_dict)
 
             prompt = (
                 (f"Riwayat percakapan sebelumnya:\n{riwayat_teks}\n\n" if riwayat_teks else "")

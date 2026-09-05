@@ -1,5 +1,5 @@
 import { Brain, ChevronDown, ChevronRight, FileText, Globe } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,6 +36,11 @@ function parseReasoning(reasoning: unknown): { text: string; sources: SourceItem
     if (!trimmed)
       continue
 
+    // Skip status messages
+    if (trimmed.includes('Sedang mencari dokumen') || trimmed.includes('Mencari dokumen')) {
+      continue
+    }
+
     // Check if line contains JSON object(s) with title/source
     const jsonMatches = trimmed.match(/\{[^{}]*"title"[^{}]*\}/g)
     if (jsonMatches && jsonMatches.length > 0) {
@@ -67,28 +72,61 @@ function parseReasoning(reasoning: unknown): { text: string; sources: SourceItem
 }
 
 export function ReasoningDisplay({ reasoning, isLoading = false }: ReasoningDisplayProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
   const { text, sources } = parseReasoning(reasoning)
 
-  if (!text && sources.length === 0)
+  // Auto-close when streaming ends
+  useEffect(() => {
+    if (!isLoading) {
+      setIsOpen(false)
+    }
+    else {
+      setIsOpen(true)
+    }
+  }, [isLoading])
+
+  // If completed and no actual reasoning text & no sources, do not display anything
+  if (!isLoading && !text && sources.length === 0) {
     return null
+  }
+
+  // Show loading indicator while request is in progress and no sources/text are present yet
+  if (isLoading && !text && sources.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground p-2 rounded-lg bg-muted/40 border border-border/50 w-full my-2">
+        <Brain className="size-4 text-primary animate-spin" />
+        <span className="font-semibold text-foreground/90">Sedang mencari dokumen resmi UHO & menganalisis...</span>
+        <span className="ml-auto flex gap-1">
+          <span className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+          <span className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+          <span className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+        </span>
+      </div>
+    )
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full my-2">
-      <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-muted/50 w-full text-left">
-        <Brain className={`size-3.5 text-primary/70 ${isLoading ? 'animate-pulse' : ''}`} />
-        <span>{sources.length > 0 ? 'Proses berpikir & referensi' : 'Proses berpikir'}</span>
+      <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors p-2 rounded-lg bg-muted/40 hover:bg-muted/70 border border-border/50 w-full text-left">
+        <Brain className={`size-4 text-primary ${isLoading ? 'animate-spin' : ''}`} />
+        <span className="font-semibold text-foreground/90">
+          {isLoading
+            ? 'Sedang berpikir & menganalisis...'
+            : sources.length > 0
+              ? 'Proses berpikir & referensi RAG'
+              : 'Proses berpikir AI'}
+        </span>
         {isOpen ? (
-          <ChevronDown className="size-3.5 ml-auto" />
+          <ChevronDown className="size-4 ml-auto text-muted-foreground" />
         ) : (
-          <ChevronRight className="size-3.5 ml-auto" />
+          <ChevronRight className="size-4 ml-auto text-muted-foreground" />
         )}
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-1 p-3 rounded-md bg-muted/40 border border-border/50 text-xs text-muted-foreground leading-relaxed space-y-2">
+      <CollapsibleContent className="mt-1.5 p-3.5 rounded-lg bg-muted/30 border border-border/50 text-xs text-muted-foreground leading-relaxed space-y-2.5">
         {sources.length > 0 && (
           <div className="space-y-1.5">
             <div className="text-[11px] font-semibold text-muted-foreground tracking-wide font-sans">
-              Sumber referensi yang ditemukan:
+              Sumber referensi UHO yang ditemukan:
             </div>
             <div className="space-y-1 font-sans">
               {sources.map((src, idx) => (
@@ -103,7 +141,7 @@ export function ReasoningDisplay({ reasoning, isLoading = false }: ReasoningDisp
                   )}
                   <span className="font-medium truncate flex-1">{src.title || src.source}</span>
                   <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted font-mono shrink-0">
-                    {src.asal === 'web_search' ? 'Pencarian Web' : 'Vector Store'}
+                    {src.asal === 'web_search' ? 'Pencarian Web' : 'Vector Store UHO'}
                   </span>
                 </div>
               ))}
@@ -112,7 +150,7 @@ export function ReasoningDisplay({ reasoning, isLoading = false }: ReasoningDisp
         )}
 
         {text && (
-          <div className="font-mono whitespace-pre-wrap leading-relaxed pt-1">
+          <div className="font-mono whitespace-pre-wrap leading-relaxed pt-1 text-foreground/80 bg-background/60 p-3 rounded-md border border-border/30 shadow-inner max-h-96 overflow-y-auto">
             {text}
           </div>
         )}

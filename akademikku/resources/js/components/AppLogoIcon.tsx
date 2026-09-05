@@ -1,14 +1,13 @@
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 
-export function AppLogoIcon(props: React.SVGProps<SVGSVGElement>) {
+export function AppLogoIcon({ className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
+    <img
+      src="/android-chrome-192x192.png"
+      alt="Akademikku Logo"
+      className={cn('size-6 rounded-md object-cover', className)}
       {...props}
-    >
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-    </svg>
+    />
   )
 }

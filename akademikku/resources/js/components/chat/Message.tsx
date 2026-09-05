@@ -26,7 +26,7 @@ export function Message({ message, chatId, isLoading = false }: MessageProps) {
       className={`group flex gap-3 py-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
     >
       <div
-        className={`flex size-8 shrink-0 select-none items-center justify-center rounded-full border shadow-sm ${
+        className={`hidden md:flex size-8 shrink-0 select-none items-center justify-center rounded-full border shadow-sm ${
           isUser
             ? 'bg-primary text-primary-foreground'
             : 'bg-muted text-muted-foreground'
@@ -36,7 +36,7 @@ export function Message({ message, chatId, isLoading = false }: MessageProps) {
       </div>
 
       <div
-        className={`flex max-w-[85%] flex-col gap-2 ${
+        className={`flex max-w-[90%] md:max-w-[85%] flex-col gap-2 ${
           isUser ? 'items-end' : 'items-start'
         }`}
       >

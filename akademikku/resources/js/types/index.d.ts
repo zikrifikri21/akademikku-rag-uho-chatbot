@@ -20,6 +20,7 @@ export interface NavItem {
 }
 
 export interface SharedData extends PageProps {
+  csrf_token?: string
   name: string
   auth: Auth
   ziggy: Config & { location: string }

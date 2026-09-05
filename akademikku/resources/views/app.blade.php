@@ -64,7 +64,7 @@
         {{-- ==================== Structured data (JSON-LD) — biar Google paham ini aplikasi AI kampus ==================== --}}
         <script type="application/ld+json">
         {
-            "@context": "https://schema.org",
+            "@@context": "https://schema.org",
             "@type": "SoftwareApplication",
             "name": "{{ config('app.name', 'Akademikku') }}",
             "applicationCategory": "EducationalApplication",
@@ -87,27 +87,27 @@
 
         {{-- ==================== Favicon ==================== --}}
         <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
-        <link rel="icon" type="image/webp" sizes="16x16" href="/favicons/favicon-16x16.webp">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
-        <link rel="icon" type="image/webp" sizes="32x32" href="/favicons/favicon-32x32.webp">
-        <link rel="icon" type="image/png" sizes="48x48" href="/favicons/favicon-48x48.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+        <link rel="icon" type="image/webp" sizes="16x16" href="/favicon-16x16.webp">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/webp" sizes="32x32" href="/favicon-32x32.webp">
+        <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
 
         {{-- Apple / iOS --}}
-        <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png">
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
         <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Akademikku') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
         {{-- Android / PWA --}}
-        <link rel="icon" type="image/png" sizes="192x192" href="/favicons/android-chrome-192x192.png">
-        <link rel="icon" type="image/png" sizes="512x512" href="/favicons/android-chrome-512x512.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+        <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
         <meta name="mobile-web-app-capable" content="yes">
 
         {{-- Manifest & Windows --}}
-        <link rel="manifest" href="/favicons/site.webmanifest">
+        <link rel="manifest" href="/site.webmanifest">
         <meta name="msapplication-TileColor" content="#1e2a78">
-        <meta name="msapplication-config" content="/favicons/browserconfig.xml">
+        <meta name="msapplication-config" content="/browserconfig.xml">
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />

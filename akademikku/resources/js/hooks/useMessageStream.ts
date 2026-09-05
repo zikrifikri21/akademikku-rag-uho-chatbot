@@ -1,5 +1,6 @@
-import type { Message, StreamEvent } from '@/types'
+import type { Message, SharedData, StreamEvent } from '@/types'
 import { ContentType, Role, StreamEventType } from '@/types/enum'
+import { usePage } from '@inertiajs/react'
 import { useStream } from '@laravel/stream-react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useState } from 'react'
@@ -123,6 +124,8 @@ export function useMessageStream(
   }
 
   const isServer = typeof window === 'undefined'
+  const page = usePage<SharedData>()
+  const csrfToken = page?.props?.csrf_token
 
   const dummyStream = {
     isStreaming: false,
@@ -138,6 +141,7 @@ export function useMessageStream(
     ? useStream<StreamParams, StreamEvent>(
         streamUrl,
         {
+          csrfToken,
           onData: parseStreamChunk,
           onError: handleStreamError,
           onFinish: handleFinish,

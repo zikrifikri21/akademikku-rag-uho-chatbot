@@ -185,6 +185,7 @@ function ChatContent({
           selectedModelId={selectedModel?.id || availableModels[0]?.id || ''}
           selectedVisibilityType={chat?.visibility!}
           isReadonly={isReadonly}
+          isGuest={isGuest}
         />
 
         {messages.length === 0 ? (
