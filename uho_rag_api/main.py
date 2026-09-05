@@ -16,14 +16,14 @@ dipakai frontend React (eventType text_delta / error), plus tambahan "sources":
 """
 
 import json
-import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from dotenv import load_dotenv
 
-load_dotenv()  # WAJIB dipanggil sebelum import rag_engine, supaya GROQ_API_KEY/TAVILY_API_KEY/CHROMA_DIR dari .env terbaca
+load_dotenv()
 
+import config
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -38,11 +38,6 @@ from rag_engine import (
 )
 from schemas import StreamRequest
 
-INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY")  # opsional: shared secret dengan Laravel
-CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost").split(",")]
-
-MAX_RIWAYAT_DIPAKAI = 10  # jumlah pesan terakhir dari history yang disertakan ke prompt
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,7 +49,7 @@ app = FastAPI(title="UHO RAG API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,9 +57,8 @@ app.add_middleware(
 
 
 def verifikasi_internal_key(x_internal_api_key: Optional[str] = Header(default=None)) -> None:
-    """Kalau INTERNAL_API_KEY diset di .env, wajib dikirim Laravel lewat header ini.
-    Kosongkan INTERNAL_API_KEY di .env untuk menonaktifkan pengecekan ini saat development."""
-    if INTERNAL_API_KEY and x_internal_api_key != INTERNAL_API_KEY:
+    """Kalau INTERNAL_API_KEY diset di .env, wajib dikirim Laravel lewat header ini."""
+    if config.INTERNAL_API_KEY and x_internal_api_key != config.INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing X-Internal-Api-Key")
 
 
@@ -83,7 +77,7 @@ async def rag_stream(payload: StreamRequest, x_internal_api_key: Optional[str] =
 
     def generate():
         try:
-            riwayat_terpakai = payload.history[-MAX_RIWAYAT_DIPAKAI:]
+            riwayat_terpakai = payload.history[-config.MAX_RIWAYAT_DIPAKAI:]
             riwayat_dict = [{"role": m.role, "content": m.content} for m in riwayat_terpakai]
 
             pertanyaan_retrieval = kontekstualisasi_pertanyaan(payload.message, riwayat_dict)
@@ -92,8 +86,7 @@ async def rag_stream(payload: StreamRequest, x_internal_api_key: Optional[str] =
             konteks, sumber, grounded = ambil_konteks(pertanyaan_retrieval, fakultas=payload.fakultas)
 
             if not grounded:
-                # Tidak ada bahan valid sama sekali -- jangan panggil LLM untuk menjawab bebas,
-                # supaya tidak ada celah untuk mengarang nama/fakta.
+                # Tidak ada bahan valid sama sekali -- jangan panggil LLM untuk menjawab bebas
                 yield event_line("text_delta", PESAN_TIDAK_TERSEDIA)
                 return
 
