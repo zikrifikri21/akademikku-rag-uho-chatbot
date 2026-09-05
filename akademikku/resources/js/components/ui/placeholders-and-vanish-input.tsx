@@ -56,81 +56,82 @@ export function PlaceholdersAndVanishInput({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [animating, setAnimating] = useState(false)
+  const particlesRef = useRef<any[]>([])
 
-  const draw = useCallback(() => {
-    if (!inputRef.current)
+  const drawAndAnimate = useCallback((textToDraw: string) => {
+    if (!inputRef.current || !canvasRef.current || !textToDraw.trim())
       return
+
     const canvas = canvasRef.current
-    if (!canvas)
-      return
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx)
       return
 
-    canvas.width = 800
-    canvas.height = 800
-    ctx.clearRect(0, 0, 800, 800)
+    const rect = inputRef.current.getBoundingClientRect()
+    canvas.width = rect.width
+    canvas.height = rect.height
+    ctx.clearRect(0, 0, rect.width, rect.height)
+
     const computed = getComputedStyle(inputRef.current)
     ctx.font = `${computed.fontSize} ${computed.fontFamily}`
     ctx.fillStyle = computed.color
-    ctx.fillText(value, 16, 40)
+    ctx.textBaseline = 'middle'
+    ctx.fillText(textToDraw, 8, rect.height / 2)
 
-    const imageData = ctx.getImageData(0, 0, 800, 800)
+    const imageData = ctx.getImageData(0, 0, rect.width, rect.height)
     const pixelData = imageData.data
     const newData: any[] = []
 
-    for (let t = 0; t < 800; t++) {
-      const i = 4 * t * 800
-      for (let n = 0; n < 800; n++) {
-        const e = i + 4 * n
-        if (pixelData[e + 3] !== 0) {
+    for (let y = 0; y < rect.height; y += 2) {
+      const rowOffset = 4 * y * rect.width
+      for (let x = 0; x < rect.width; x += 2) {
+        const offset = rowOffset + 4 * x
+        const alpha = pixelData[offset + 3]
+        if (alpha > 20) {
           newData.push({
-            x: n,
-            y: t,
-            color: [pixelData[e], pixelData[e + 1], pixelData[e + 2], pixelData[e + 3]],
+            x,
+            y,
+            r: Math.random() * 1.8 + 0.8,
+            color: `rgba(${pixelData[offset]}, ${pixelData[offset + 1]}, ${pixelData[offset + 2]}, ${alpha / 255})`,
+            vx: (Math.random() - 0.5) * 5,
+            vy: (Math.random() - 0.5) * 5 - 1,
           })
         }
       }
     }
 
-    const particles = newData.map(pixel => ({
-      x: pixel.x,
-      y: pixel.y,
-      r: Math.random() * 2 + 1,
-      color: `rgba(${pixel.color[0]}, ${pixel.color[1]}, ${pixel.color[2]}, ${pixel.color[3] / 255})`,
-      vx: Math.random() * 4 - 2,
-      vy: Math.random() * 4 - 2,
-    }))
+    particlesRef.current = newData
+    setAnimating(true)
 
     const render = () => {
-      ctx.clearRect(0, 0, 800, 800)
-      let count = 0
-      particles.forEach((p) => {
+      ctx.clearRect(0, 0, rect.width, rect.height)
+      let activeCount = 0
+
+      particlesRef.current.forEach((p) => {
         if (p.r > 0.1) {
           ctx.beginPath()
           ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
           ctx.fillStyle = p.color
           ctx.fill()
+
           p.x += p.vx
           p.y += p.vy
-          p.r -= 0.05
-          count++
+          p.r -= 0.04
+          activeCount++
         }
       })
-      if (count > 0) {
+
+      if (activeCount > 0) {
         requestAnimationFrame(render)
       }
       else {
         setAnimating(false)
+        ctx.clearRect(0, 0, rect.width, rect.height)
       }
     }
-    render()
-  }, [value])
 
-  const vanishAndSubmit = () => {
-    setAnimating(true)
-    draw()
-  }
+    render()
+  }, [])
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -140,7 +141,9 @@ export function PlaceholdersAndVanishInput({
     }
     if (!value.trim() || disabled)
       return
-    vanishAndSubmit()
+
+    const textToAnimate = value
+    drawAndAnimate(textToAnimate)
     onSubmit(e)
   }
 
@@ -148,7 +151,8 @@ export function PlaceholdersAndVanishInput({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       if (value.trim() && !disabled && !isLoading) {
-        vanishAndSubmit()
+        const textToAnimate = value
+        drawAndAnimate(textToAnimate)
         onSubmit(e as any)
       }
     }
@@ -165,8 +169,8 @@ export function PlaceholdersAndVanishInput({
       <canvas
         ref={canvasRef}
         className={cn(
-          'absolute pointer-events-none text-base transform scale-50 top-0 left-0 origin-top-left filter invert dark:invert-0 pr-20',
-          !animating ? 'opacity-0' : 'opacity-100',
+          'absolute inset-0 pointer-events-none z-30 w-full h-full pl-2 pr-12',
+          !animating && 'opacity-0',
         )}
       />
 
