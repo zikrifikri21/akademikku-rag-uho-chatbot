@@ -1,2 +1,19 @@
 User-agent: *
-Disallow:
+Allow: /
+Allow: /tentang
+Allow: /login
+Allow: /register
+
+# Jangan index halaman percakapan/chat (berisi data pribadi user)
+Disallow: /chat/
+Disallow: /c/
+Disallow: /conversations/
+
+# Jangan index area backend/API/admin
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /settings/
+Disallow: /profile/
+
+Sitemap: https://akademikku.uho.ac.id/sitemap.xml
