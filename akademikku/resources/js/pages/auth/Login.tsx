@@ -16,7 +16,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
   const form = useForm({
     email: '',
     password: '',
-    remember: false,
+    remember: true,
   })
 
   const submit = (e: React.FormEvent) => {

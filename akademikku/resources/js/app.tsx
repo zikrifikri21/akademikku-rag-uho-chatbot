@@ -22,6 +22,22 @@ router.on('navigate', (event) => {
   }
 })
 
+// Auto-redirect to login page when session expires (419 Page Expired or 401 Unauthenticated)
+router.on('invalid', (event) => {
+  const status = event.detail.response?.status
+  if (status === 419 || status === 401) {
+    event.preventDefault()
+    window.location.href = route('login')
+  }
+})
+
+router.on('exception', (event) => {
+  const status = (event.detail as any)?.response?.status
+  if (status === 419 || status === 401) {
+    window.location.href = route('login')
+  }
+})
+
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel'
 
 createInertiaApp({

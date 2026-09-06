@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Foundation\Application;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
@@ -25,5 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->respond(function (Response $response, \Throwable $exception, Request $request) {
+            if (in_array($response->getStatusCode(), [419, 401])) {
+                return redirect()->guest(route('login'))->with('status', 'Sesi Anda telah berakhir, silakan login kembali.');
+            }
+
+            return $response;
+        });
     })->create();
