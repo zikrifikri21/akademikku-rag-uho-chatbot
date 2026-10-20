@@ -37,13 +37,14 @@ final class AppServiceProvider extends ServiceProvider
 
     /**
      * Configure the application's URL.
-     * This is optional, but it's recommended to force HTTPS in production.
+     * Force HTTPS only when explicitly enabled via FORCE_HTTPS=true env var.
+     * This allows HTTP-only deployments (e.g. Docker without SSL termination).
      *
      * @see https://laravel.com/docs/octane#serving-your-application-via-https
      */
     private function configureUrl(): void
     {
-        URL::forceHttps(App::isProduction());
+        URL::forceHttps((bool) env('FORCE_HTTPS', false));
     }
 
     /**

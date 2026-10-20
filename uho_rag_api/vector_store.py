@@ -10,6 +10,9 @@ from urllib.parse import urlparse
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
+import chromadb
+from chromadb.config import Settings
+
 import config
 
 
@@ -23,8 +26,13 @@ class VectorStoreDAO:
     def init_store(self) -> None:
         """Inisialisasi embedding model & ChromaDB vector store."""
         self.embedding_model = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
+        
+        chroma_client = chromadb.PersistentClient(
+            path=config.CHROMA_DIR,
+            settings=Settings(anonymized_telemetry=False, is_persistent=True)
+        )
         self.vectorstore = Chroma(
-            persist_directory=config.CHROMA_DIR,
+            client=chroma_client,
             embedding_function=self.embedding_model,
             collection_name=config.COLLECTION_NAME,
         )

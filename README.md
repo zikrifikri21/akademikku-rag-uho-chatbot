@@ -160,6 +160,31 @@ Setelah kedua bagian terkonfigurasi:
 
 ---
 
+## 🐳 Jalankan via Docker & Docker Compose
+
+Proyek ini dilengkapi dengan konfigurasi **Docker** dan **Docker Compose** lengkap untuk deployment cepat:
+
+1. **Salin environment file**:
+   ```bash
+   cp .env.example .env
+   ```
+2. **Isi API Key pada file `.env`**:
+   - `GROQ_API_KEY`
+   - `TAVILY_API_KEY` (opsional)
+   - `APP_KEY` (dapat dibuat dengan `php artisan key:generate --show` dari folder `akademikku`)
+
+3. **Jalankan container**:
+   ```bash
+   docker compose up --build -d
+   ```
+
+4. **Akses aplikasi**:
+   - Web App (Laravel + React): `http://localhost:8000`
+   - Python RAG Microservice: `http://localhost:8001/health`
+
+---
+
+
 ## 📡 API Contract (`uho_rag_api`)
 
 ### Endpoint Status

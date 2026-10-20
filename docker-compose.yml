@@ -1,0 +1,74 @@
+name: akademikku-rag-uho
+
+services:
+  # Microservice Python FastAPI RAG
+  rag-api:
+    build:
+      context: ./uho_rag_api
+      dockerfile: Dockerfile
+    container_name: uho_rag_api
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - CHROMA_DIR=/app/chroma_db_uho
+      - CHROMA_COLLECTION=${CHROMA_COLLECTION:-uho_knowledge_base}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+      - DEFAULT_GROQ_MODEL=${DEFAULT_GROQ_MODEL:-openai/gpt-oss-20b}
+      - AMBANG_SKOR_RELEVANSI=${AMBANG_SKOR_RELEVANSI:-0.35}
+      - RETRIEVAL_K=${RETRIEVAL_K:-8}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-secret_rag_key_123}
+      - CORS_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,http://localhost
+    volumes:
+      - hf_cache:/root/.cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # Aplikasi Web Utama (Laravel 12 + React 19 Inertia)
+  web:
+    build:
+      context: ./akademikku
+      dockerfile: Dockerfile
+    container_name: akademikku_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      rag-api:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - APP_NAME=Akademikku RAG UHO
+      - APP_ENV=${APP_ENV:-production}
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL:-http://localhost:8000}
+      - ASSET_URL=${APP_URL:-http://localhost:8000}
+      - FORCE_HTTPS=false
+      - DB_CONNECTION=sqlite
+      - DB_DATABASE=/var/www/html/database/database.sqlite
+      - RAG_API_URL=http://rag-api:8001
+      - RAG_API_KEY=${INTERNAL_API_KEY:-secret_rag_key_123}
+      - SESSION_DRIVER=database
+      - CACHE_STORE=database
+      - QUEUE_CONNECTION=sync
+    volumes:
+      - sqlite_data:/var/www/html/database
+      - storage_data:/var/www/html/storage
+
+volumes:
+  sqlite_data:
+  storage_data:
+  hf_cache:
