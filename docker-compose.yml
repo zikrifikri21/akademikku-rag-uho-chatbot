@@ -1,7 +1,7 @@
 name: akademikku-rag-uho
 
 services:
-  # Microservice Python FastAPI RAG
+  # Microservice Python FastAPI RAG (v2: bge-m3 + BM25 + reranker)
   rag-api:
     build:
       context: ./uho_rag_api
@@ -9,30 +9,17 @@ services:
     container_name: uho_rag_api
     restart: unless-stopped
     ports:
-      - "8001:8001"
-    env_file:
-      - path: .env
-        required: false
+      - "127.0.0.1:8001:8001"
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
-      - CHROMA_DIR=/app/chroma_db_uho
-      - CHROMA_COLLECTION=${CHROMA_COLLECTION:-uho_knowledge_base}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+      - GROQ_API_KEY=${GROQ_API_KEY:?isi GROQ_API_KEY di .env}
       - DEFAULT_GROQ_MODEL=${DEFAULT_GROQ_MODEL:-openai/gpt-oss-20b}
-      - AMBANG_SKOR_RELEVANSI=${AMBANG_SKOR_RELEVANSI:-0.35}
-      - RETRIEVAL_K=${RETRIEVAL_K:-8}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-secret_rag_key_123}
-      - CORS_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,http://localhost
-    volumes:
-      - hf_cache:/root/.cache
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:?isi INTERNAL_API_KEY di .env}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "curl -fs http://localhost:8001/health || exit 1"]
+      interval: 15s
       timeout: 5s
       retries: 12
-      start_period: 60s
+      start_period: 240s
 
   # Aplikasi Web Utama (Laravel 12 + React 19 Inertia)
   web:
@@ -46,13 +33,10 @@ services:
     depends_on:
       rag-api:
         condition: service_healthy
-    env_file:
-      - path: .env
-        required: false
     environment:
       - APP_NAME=Akademikku RAG UHO
       - APP_ENV=${APP_ENV:-production}
-      - APP_KEY=${APP_KEY}
+      - APP_KEY=${APP_KEY:?isi APP_KEY di .env}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost:8000}
       - ASSET_URL=${APP_URL:-http://localhost:8000}
@@ -60,7 +44,7 @@ services:
       - DB_CONNECTION=sqlite
       - DB_DATABASE=/var/www/html/database/database.sqlite
       - RAG_API_URL=http://rag-api:8001
-      - RAG_API_KEY=${INTERNAL_API_KEY:-secret_rag_key_123}
+      - RAG_API_KEY=${INTERNAL_API_KEY:?isi INTERNAL_API_KEY di .env}
       - SESSION_DRIVER=database
       - CACHE_STORE=database
       - QUEUE_CONNECTION=sync
@@ -71,4 +55,3 @@ services:
 volumes:
   sqlite_data:
   storage_data:
-  hf_cache:

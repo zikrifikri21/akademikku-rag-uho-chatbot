@@ -1,21 +1,20 @@
 """
-UHO RAG API -- microservice internal yang dipanggil dari server Laravel
-(ChatStreamController / GuestChatStreamController) untuk menggantikan
-pemanggilan Prism/Groq langsung dengan jawaban yang dilandasi RAG
-(vector store hasil scraping+PDF, dengan fallback web search live).
+UHO RAG API -- microservice internal yang dipanggil dari server Laravel (ChatStreamController / GuestChatStreamController).
 
-Jalankan:
-    uvicorn main:app --host 0.0.0.0 --port 8001
-
-Endpoint utama: POST /api/rag/stream
-Format tiap baris NDJSON yang di-stream, kompatibel dengan format yang sudah
-dipakai frontend React (eventType text_delta / error), plus tambahan "sources":
-    {"eventType": "text_delta", "content": "..."}
-    {"eventType": "sources", "content": [{"title": ..., "source": ..., "asal": ...}, ...]}
+Jalankan:  uvicorn main:app --host 0.0.0.0 --port 8001
+Endpoint:  POST /api/rag/stream  (NDJSON, satu event per baris)
+    {"eventType": "text_delta", "content": "..."}      # teks jawaban (sudah memuat baris "Sumber: dokumen, Pasal, halaman")
+    {"eventType": "sources", "content": [{"title", "source", "asal", "pasal", "halaman", "halaman_akhir"}, ...]}
     {"eventType": "error", "content": "..."}
+
+Catatan: jawaban dihasilkan utuh (mode JSON supaya sitasi bisa divalidasi) lalu dikirim bertahap,
+jadi format stream tetap sama dengan yang dipakai frontend.
 """
 
+import hmac
 import json
+import logging
+import re
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -28,15 +27,10 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from rag_engine import (
-    init_engine,
-    ambil_konteks,
-    get_llm,
-    SYSTEM_PROMPT,
-    PESAN_TIDAK_TERSEDIA,
-    kontekstualisasi_pertanyaan,
-)
+from rag_engine import init_engine, jawab
 from schemas import StreamRequest
+
+log = logging.getLogger("uho_rag")
 
 
 @asynccontextmanager
@@ -45,25 +39,33 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="UHO RAG API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="UHO RAG API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type", "X-Internal-Api-Key"],
 )
 
 
-def verifikasi_internal_key(x_internal_api_key: Optional[str] = Header(default=None)) -> None:
-    """Kalau INTERNAL_API_KEY diset di .env, wajib dikirim Laravel lewat header ini."""
-    if config.INTERNAL_API_KEY and x_internal_api_key != config.INTERNAL_API_KEY:
+def verifikasi_internal_key(x_internal_api_key: Optional[str]) -> None:
+    """Kalau INTERNAL_API_KEY diset, wajib dikirim Laravel lewat header X-Internal-Api-Key."""
+    if config.INTERNAL_API_KEY and not hmac.compare_digest(
+        (x_internal_api_key or "").encode(), config.INTERNAL_API_KEY.encode()
+    ):
         raise HTTPException(status_code=401, detail="Invalid or missing X-Internal-Api-Key")
 
 
 def event_line(event_type: str, content) -> str:
     return json.dumps({"eventType": event_type, "content": content}, ensure_ascii=False) + "\n"
+
+
+def potong_stream(teks: str, per_event: int = 4):
+    kata = re.findall(r"\s*\S+", teks)
+    for i in range(0, len(kata), per_event):
+        yield "".join(kata[i:i + per_event])
 
 
 @app.get("/health")
@@ -77,42 +79,14 @@ async def rag_stream(payload: StreamRequest, x_internal_api_key: Optional[str] =
 
     def generate():
         try:
-            riwayat_terpakai = payload.history[-config.MAX_RIWAYAT_DIPAKAI:]
-            riwayat_dict = [{"role": m.role, "content": m.content} for m in riwayat_terpakai]
-
-            pertanyaan_retrieval = kontekstualisasi_pertanyaan(payload.message, riwayat_dict)
-            print(f"[main] Query retrieval setelah kontekstualisasi: {pertanyaan_retrieval!r}")
-
-            konteks, sumber, grounded = ambil_konteks(pertanyaan_retrieval, fakultas=payload.fakultas)
-
-            if not grounded:
-                # Tidak ada bahan valid sama sekali -- jangan panggil LLM untuk menjawab bebas
-                yield event_line("text_delta", PESAN_TIDAK_TERSEDIA)
-                return
-
-            riwayat_teks = "\n".join(f"{m['role']}: {m['content']}" for m in riwayat_dict)
-
-            prompt = (
-                (f"Riwayat percakapan sebelumnya:\n{riwayat_teks}\n\n" if riwayat_teks else "")
-                + f"Konteks:\n{konteks}\n\n"
-                + f"Pertanyaan mahasiswa: {payload.message}\n\n"
-                + "Jawab dengan jelas dan ringkas dalam Bahasa Indonesia."
-            )
-
-            llm = get_llm(payload.model)
-            for chunk in llm.stream([("system", SYSTEM_PROMPT), ("human", prompt)]):
-                if chunk.content:
-                    yield event_line("text_delta", chunk.content)
-
+            riwayat = [{"role": m.role, "content": m.content} for m in payload.history[-config.MAX_RIWAYAT_DIPAKAI:]]
+            teks, sumber = jawab(payload.message, riwayat, fakultas=payload.fakultas, model=payload.model)
+            for potongan in potong_stream(teks):
+                yield event_line("text_delta", potongan)
             if sumber:
-                sumber_unik, seen = [], set()
-                for m in sumber:
-                    if m["source"] not in seen:
-                        seen.add(m["source"])
-                        sumber_unik.append(m)
-                yield event_line("sources", sumber_unik)
-
-        except Exception as e:
-            yield event_line("error", f"Stream failed: {e}")
+                yield event_line("sources", sumber)
+        except Exception:
+            log.exception("Stream gagal")       # detail hanya di log server, tidak dikirim ke klien
+            yield event_line("error", "Terjadi kesalahan pada layanan. Silakan coba lagi.")
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")

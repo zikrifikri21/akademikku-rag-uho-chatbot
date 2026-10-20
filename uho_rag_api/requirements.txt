@@ -1,13 +1,14 @@
+# PENTING: samakan versi dengan notebook (sel "Catat versi paket") -- terutama chromadb, karena index dibangun di Colab.
+# Tempel hasil sel itu di sini (pakai ==) setelah index final; tanda >= di bawah hanya batas bawah.
 fastapi>=0.115
 uvicorn[standard]>=0.30
 pydantic>=2.7
+python-dotenv>=1.0
+langchain-core>=0.3
+langchain-groq>=0.2
 langchain-huggingface>=0.1
 langchain-chroma>=0.1
-langchain-groq>=0.2
-langchain-openai>=0.1
-langchain-anthropic>=0.1
-langchain-core>=0.3
 chromadb>=0.5
 sentence-transformers>=3.0
-tavily-python>=0.5
-python-dotenv>=1.0
+rank-bm25>=0.2.2
+# torch dipasang terpisah di Dockerfile (CPU). Untuk tes: pip install httpx

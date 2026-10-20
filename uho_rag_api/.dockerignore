@@ -1,8 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
 .env
 .git/
 .gitignore
+test_smoke.py

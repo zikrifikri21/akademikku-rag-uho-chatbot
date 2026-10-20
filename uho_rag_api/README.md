@@ -1,72 +1,65 @@
 # UHO RAG API
 
-Microservice FastAPI yang menyediakan jawaban chatbot berbasis RAG (vector
-store hasil scraping web + PDF, dengan fallback web search live) untuk
-dipanggil dari backend Laravel `akademikku` yang sudah ada — menggantikan
-pemanggilan Prism/Groq langsung di `ChatStreamController` dan
-`GuestChatStreamController`.
+Microservice FastAPI untuk chatbot akademik UHO. Implementasi serving dari notebook
+`rag_akademik_uho_pipeline_v3` (retrieval hybrid vektor + BM25 -> reranker -> jawaban JSON bersitasi),
+dipanggil dari backend Laravel `akademikku` menggantikan pemanggilan Prism/Groq langsung.
+
+Perilaku jawaban:
+- Ada di dokumen: jawaban + baris `Sumber: [n] <dokumen>, Pasal X, hal. N (halaman PDF)`.
+- Tidak ada (skor di bawah `MIN_RERANK_SCORE`, LLM menyatakan tidak ditemukan, atau tanpa sitasi valid):
+  *"Maaf, saya tidak menemukan informasi itu di dokumen akademik resmi UHO yang tersedia. Silakan hubungi bagian akademik fakultas Anda."*
+- Tidak ada fallback web: hanya dokumen yang ada di index.
 
 ## 1. Setup
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+python -m venv venv && source venv/bin/activate     # Windows: venv\Scripts\activate
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
-
-cp .env.example .env
-# isi GROQ_API_KEY, TAVILY_API_KEY (opsional), dan pastikan CHROMA_DIR
-# menunjuk ke folder chroma_db_uho hasil notebook Colab kamu
+cp .env.example .env     # isi GROQ_API_KEY dan INTERNAL_API_KEY
 ```
 
-**Penting**: copy folder `chroma_db_uho/` (hasil embedding dari notebook
-Colab) ke server tempat FastAPI ini jalan, lalu arahkan `CHROMA_DIR` di
-`.env` ke situ. `EMBEDDING_MODEL` di `.env` harus **sama persis** dengan
-yang dipakai saat membangun vector store di notebook, karena beda model
-embedding = beda ruang vektor = pencarian tidak akan cocok.
+Salin folder **`chroma_db_akademik/`** dari notebook (Drive) ke server dan arahkan `CHROMA_DIR` ke situ.
+`EMBEDDING_MODEL` harus sama dengan notebook (`BAAI/bge-m3`) dan versi `chromadb` harus sama dengan Colab
+(tempel hasil sel "Catat versi paket" ke `requirements.txt`). Kalau koleksi tidak ada/kosong atau model embedding
+tidak cocok, service **gagal start dengan pesan jelas** (tidak diam-diam menjawab "tidak tersedia").
 
 ## 2. Jalankan
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn main:app --host 0.0.0.0 --port 8001
 ```
-
-Cek: `GET http://localhost:8001/health` -> `{"status": "ok"}`
+`GET /health` -> `{"status": "ok"}`. Startup memuat embedding, reranker, dan BM25 (beberapa menit di CPU).
 
 ## 3. Kontrak API
 
-**POST** `/api/rag/stream`
+**POST** `/api/rag/stream` (header `X-Internal-Api-Key` kalau `INTERNAL_API_KEY` diisi)
 
-Body:
 ```json
 {
-  "message": "apa saja syarat pengajuan cuti akademik di UHO?",
+  "message": "apakah bisa saya ajukan cuti lagi kalau saya sudah pernah cuti 2x?",
   "model": "openai/gpt-oss-20b",
-  "history": [
-    {"role": "user", "content": "halo"},
-    {"role": "assistant", "content": "halo juga, ada yang bisa dibantu?"}
-  ],
+  "history": [{"role": "user", "content": "halo"}, {"role": "assistant", "content": "halo, ada yang bisa dibantu?"}],
   "fakultas": "FMIPA"
 }
 ```
-- `model` opsional -- kalau kosong pakai `DEFAULT_GROQ_MODEL` dari `.env`. Dilewatkan apa adanya ke Groq, jadi bisa pakai id yang sama dengan `ModelName` enum di Laravel (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, dst).
-- `history` opsional -- riwayat percakapan, hanya 10 pesan terakhir yang dipakai.
-- `fakultas` opsional -- kalau dikirim dan pertanyaan tidak menyebut dokumen tertentu secara eksplisit, pencarian difilter ke fakultas ini (metadata yang sudah ada di vector store).
+- `model` opsional, harus ada di `ALLOWED_MODELS`; selain itu dipakai `DEFAULT_GROQ_MODEL`.
+- `history` opsional (maks. 40 pesan masuk, 10 terakhir dipakai). `role` hanya `user`/`assistant`.
+- `fakultas` opsional: mencari di dokumen fakultas itu **dan** dokumen tingkat UNIVERSITAS.
 
-Response: `StreamingResponse` NDJSON, satu event per baris:
+Response NDJSON:
 ```
-{"eventType": "text_delta", "content": "Berdasarkan"}
-{"eventType": "text_delta", "content": " Peraturan..."}
-{"eventType": "sources", "content": [{"title": "...", "source": "https://...", "asal": "vector_store"}]}
+{"eventType": "text_delta", "content": "Tergantung jenjang ... [1]"}
+{"eventType": "text_delta", "content": "\n\nSumber:\n[1] Peraturan ..., Pasal 96, hal. 69 (halaman PDF)"}
+{"eventType": "sources", "content": [{"title": "...", "source": "https://..." , "asal": "vector_store", "pasal": "96", "halaman": 69, "halaman_akhir": 69}]}
 ```
-Format `text_delta`/`error` ini **sama** dengan yang sudah dipakai
-`ChatStreamController` saat ini, jadi frontend React tidak perlu diubah.
-Event `sources` adalah tambahan baru -- opsional untuk dirender di UI
-(mis. daftar link "Sumber" di bawah tiap jawaban).
+Jawaban dihasilkan utuh lalu dikirim bertahap (mode JSON diperlukan untuk memvalidasi sitasi), jadi format
+`text_delta` / `error` tetap sama dengan yang dipakai frontend. Teks sudah memuat baris "Sumber"; event `sources`
+(hanya sumber yang dipakai, `source` = null untuk PDF tanpa URL) opsional untuk dirender sebagai tautan.
 
-## 4. Menyambungkan ke Laravel (ChatStreamController)
+## 4. Menyambungkan ke Laravel
 
-Ganti bagian yang memanggil `Prism::text()...` dengan HTTP call streaming
-ke service ini. Contoh pola di `ChatStreamController::__invoke`:
+Pola di `ChatStreamController::__invoke` tidak berubah dari versi sebelumnya:
 
 ```php
 use Illuminate\Support\Facades\Http;
@@ -77,9 +70,7 @@ return Response::stream(function () use ($chat, $messages, $model): Generator {
         'content' => $m->content,
     ])->values()->all();
 
-    $response = Http::withHeaders([
-            'X-Internal-Api-Key' => config('services.rag_api.key'),
-        ])
+    $response = Http::withHeaders(['X-Internal-Api-Key' => config('services.rag_api.key')])
         ->timeout(0)
         ->withOptions(['stream' => true])
         ->post(config('services.rag_api.url') . '/api/rag/stream', [
@@ -109,42 +100,19 @@ return Response::stream(function () use ($chat, $messages, $model): Generator {
     }
 
     if ($fullText !== '') {
-        $chat->messages()->create([
-            'role' => 'assistant',
-            'parts' => ['text' => $fullText],
-            'attachments' => '[]',
-        ]);
+        $chat->messages()->create(['role' => 'assistant', 'parts' => ['text' => $fullText], 'attachments' => '[]']);
         $chat->touch();
     }
 });
 ```
-
-Tambahkan di `config/services.php`:
-```php
-'rag_api' => [
-    'url' => env('RAG_API_URL', 'http://localhost:8001'),
-    'key' => env('RAG_API_KEY'),
-],
-```
-
-Dan di `.env` Laravel:
-```
-RAG_API_URL=http://localhost:8001
-RAG_API_KEY=samakan-dengan-INTERNAL_API_KEY-di-fastapi
-```
-
-`GuestChatStreamController` bisa diubah dengan pola yang sama, cukup
-riwayat percakapannya diambil dari `history` yang dikirim frontend
-(bukan dari database `messages`).
+`config/services.php`: `'rag_api' => ['url' => env('RAG_API_URL', 'http://localhost:8001'), 'key' => env('RAG_API_KEY')]`;
+`RAG_API_KEY` sama dengan `INTERNAL_API_KEY` di sini. `GuestChatStreamController` memakai pola yang sama dengan `history` dari frontend.
 
 ## 5. Catatan
 
-- Muat model embedding & vector store terjadi sekali saat startup
-  (`lifespan`), bukan per-request -- jadi request pertama setelah restart
-  server akan sedikit lebih lambat (loading model), request berikutnya cepat.
-- Kalau nanti kamu update knowledge base di notebook Colab, cukup copy ulang
-  folder `chroma_db_uho/` yang baru ke server ini dan restart service --
-  tidak perlu deploy ulang kode.
-- `INTERNAL_API_KEY` sebaiknya diisi di production supaya endpoint ini tidak
-  bisa dipanggil sembarang orang yang tahu URL-nya (service ini didesain
-  dipanggil server-to-server dari Laravel, bukan langsung dari browser).
+- Update knowledge base: bangun ulang di notebook, salin folder index baru, restart service (kode tidak perlu deploy ulang).
+- Kalibrasi `MIN_RERANK_SCORE` dengan pertanyaan nyata (sel evaluasi notebook); log `[rag_engine] ... skor tertinggi` membantu.
+- Reranker di CPU lambat. Kalau latensi tinggi: turunkan `RERANK_CANDIDATES`, atau pakai GPU (`DEVICE=cuda`).
+  Belum ada batas konkurensi, jadi banyak request bersamaan di CPU akan saling memperlambat.
+- Belum ada rate limit; pasang di gateway/Laravel kalau endpoint chat publik (guest).
+- Tes: `pip install httpx && python test_smoke.py` (tanpa model dan tanpa Groq).

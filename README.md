@@ -97,11 +97,11 @@ akedmikku-rag-uho/
    ```env
    GROQ_API_KEY=gsk_your_groq_api_key_here
    TAVILY_API_KEY=tvly-your_tavily_api_key_here
-   CHROMA_DIR=./chroma_db_uho
+   CHROMA_DIR=./chroma_db_akademik
    EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
    INTERNAL_API_KEY=your_shared_secret_key
    ```
-5. Pastikan folder vector database `chroma_db_uho/` (hasil dari notebook `rag_uho_pipeline.ipynb`) diletakkan di dalam `uho_rag_api/`.
+5. Pastikan folder vector database `chroma_db_akademik/` (hasil dari notebook `rag_uho_pipeline.ipynb`) diletakkan di dalam `uho_rag_api/`.
 
 6. Jalankan server FastAPI:
    ```bash
