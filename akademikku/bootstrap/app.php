@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // App hanya bisa dijangkau lewat cloudflared/reverse proxy di jaringan Docker,
+        // jadi header X-Forwarded-* (IP klien, skema https) aman dipercaya.
+        $middleware->trustProxies(at: '*');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [

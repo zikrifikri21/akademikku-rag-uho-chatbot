@@ -1,4 +1,10 @@
-name: akademikku-rag-uho
+name: akademik-uho
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # Microservice Python FastAPI RAG (v2: bge-m3 + BM25 + reranker)
@@ -6,14 +12,31 @@ services:
     build:
       context: ./uho_rag_api
       dockerfile: Dockerfile
+      args:
+        # Model diunduh saat build; harus sama dengan nilai runtime di bawah.
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+        RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
     container_name: uho_rag_api
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8001:8001"
+    logging: *logging
+    # bge-m3 + reranker di CPU butuh kira-kira 5-6 GB RAM.
+    mem_limit: ${RAG_MEM_LIMIT:-6g}
+    networks: [app]
     environment:
       - GROQ_API_KEY=${GROQ_API_KEY:?isi GROQ_API_KEY di .env}
       - DEFAULT_GROQ_MODEL=${DEFAULT_GROQ_MODEL:-openai/gpt-oss-20b}
+      - ALLOWED_MODELS=${ALLOWED_MODELS:-openai/gpt-oss-20b,openai/gpt-oss-120b}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:?isi INTERNAL_API_KEY di .env}
+      # Index ChromaDB: nama koleksi & model embedding HARUS sama dengan notebook
+      - CHROMA_DIR=/app/chroma_db_akademik
+      - CHROMA_COLLECTION=${CHROMA_COLLECTION:-akademik_uho}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
+      - RERANK_MODEL=${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      - RERANK_CANDIDATES=${RERANK_CANDIDATES:-20}
+      - MIN_RERANK_SCORE=${MIN_RERANK_SCORE:-0.2}
+    volumes:
+      # Folder hasil notebook, tidak ada di git. Jangan :ro (Chroma membuka sqlite).
+      - ./uho_rag_api/chroma_db_akademik:/app/chroma_db_akademik
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8001/health || exit 1"]
       interval: 15s
@@ -28,8 +51,8 @@ services:
       dockerfile: Dockerfile
     container_name: akademikku_web
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    logging: *logging
+    networks: [app]
     depends_on:
       rag-api:
         condition: service_healthy
@@ -38,9 +61,10 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - APP_KEY=${APP_KEY:?isi APP_KEY di .env}
       - APP_DEBUG=${APP_DEBUG:-false}
-      - APP_URL=${APP_URL:-http://localhost:8000}
+      - APP_URL=${APP_URL:-https://akademik-uho.inovasitech.com}
       - ASSET_URL=${APP_URL:-http://localhost:8000}
-      - FORCE_HTTPS=false
+      # true karena diakses lewat https (Traefik)
+      - FORCE_HTTPS=${FORCE_HTTPS:-true}
       - DB_CONNECTION=sqlite
       - DB_DATABASE=/var/www/html/database/database.sqlite
       - RAG_API_URL=http://rag-api:8001
@@ -48,9 +72,28 @@ services:
       - SESSION_DRIVER=database
       - CACHE_STORE=database
       - QUEUE_CONNECTION=sync
+      - LOG_CHANNEL=stderr
     volumes:
       - sqlite_data:/var/www/html/database
       - storage_data:/var/www/html/storage
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=akademik-uho_app"
+      - "traefik.http.services.akademik-uho.loadbalancer.server.port=8000"
+      - "traefik.http.routers.akademik-uho.rule=Host(`akademik-uho.inovasitech.com`)"
+      - "traefik.http.routers.akademik-uho.entrypoints=websecure"
+      - "traefik.http.routers.akademik-uho.tls=true"
+      - "traefik.http.routers.akademik-uho.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.akademik-uho.service=akademik-uho"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8000/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  app:
 
 volumes:
   sqlite_data:

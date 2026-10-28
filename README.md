@@ -1,6 +1,6 @@
 # 🎓 Akademikku RAG UHO Chatbot
 
-> Monorepo Chatbot Akademik Universitas Halu Oleo (UHO) berbasis **Retrieval-Augmented Generation (RAG)**. Mengintegrasikan aplikasi web Laravel 12 + React 19 Inertia v2 dengan Microservice Python FastAPI RAG (LangChain + ChromaDB + Groq + Tavily).
+> Monorepo Chatbot Akademik Universitas Halu Oleo (UHO) berbasis **Retrieval-Augmented Generation (RAG)**. Mengintegrasikan aplikasi web Laravel 12 + React 19 Inertia v2 dengan Microservice Python FastAPI RAG (LangChain + ChromaDB + Groq).
 
 ---
 
@@ -162,25 +162,30 @@ Setelah kedua bagian terkonfigurasi:
 
 ## 🐳 Jalankan via Docker & Docker Compose
 
-Proyek ini dilengkapi dengan konfigurasi **Docker** dan **Docker Compose** lengkap untuk deployment cepat:
-
 1. **Salin environment file**:
    ```bash
    cp .env.example .env
    ```
-2. **Isi API Key pada file `.env`**:
-   - `GROQ_API_KEY`
-   - `TAVILY_API_KEY` (opsional)
-   - `APP_KEY` (dapat dibuat dengan `php artisan key:generate --show` dari folder `akademikku`)
-
-3. **Jalankan container**:
+2. **Isi `.env`**: `GROQ_API_KEY`, `INTERNAL_API_KEY` (acak), `APP_KEY`
+   (`php artisan key:generate --show` dari folder `akademikku`), dan `APP_ENV=production`.
+3. **Letakkan index ChromaDB** hasil notebook di `uho_rag_api/chroma_db_akademik/`.
+   Folder ini tidak ada di git. `CHROMA_COLLECTION` dan `EMBEDDING_MODEL` di `.env`
+   harus sama dengan yang dipakai notebook. Tanpa index, container `rag-api` tidak akan sehat.
+4. **Jalankan**:
    ```bash
    docker compose up --build -d
    ```
+   - Web: `https://akademik-uho.inovasitech.com` · RAG health: `docker compose exec rag-api curl -s localhost:8001/health`
+   - Server butuh RAM ±6 GB bebas untuk container `rag-api` (atur `RAG_MEM_LIMIT`).
 
-4. **Akses aplikasi**:
-   - Web App (Laravel + React): `http://localhost:8000`
-   - Python RAG Microservice: `http://localhost:8001/health`
+### Publikasi HTTPS dengan Traefik
+Compose sudah berisi label Traefik untuk `akademik-uho.inovasitech.com` (entrypoint `websecure`,
+resolver `letsencrypt`). Syarat: DNS `A` record domain mengarah ke IP server, dan container Traefik
+tergabung ke network `akademik-uho_app`:
+```bash
+docker network connect akademik-uho_app <nama-container-traefik>
+```
+Tidak ada port yang dipublikasikan ke host; akses debug dengan `docker compose exec web ...`.
 
 ---
 

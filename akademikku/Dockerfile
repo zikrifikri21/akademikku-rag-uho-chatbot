@@ -12,7 +12,7 @@ RUN composer dump-autoload --optimize
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package.json package-lock.json bun.lock* ./
-RUN npm ci || npm install
+RUN npm ci
 COPY . .
 # Copy vendor directory from composer stage (required for Ziggy imports in React)
 COPY --from=composer-builder /app/vendor ./vendor
@@ -47,9 +47,12 @@ COPY --from=frontend-builder /app/public/build /var/www/html/public/build
 # Copy docker runtime configurations
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/www.conf /usr/local/etc/php-fpm.d/zz-www.conf
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+# sed: jaga-jaga kalau file checkout di Windows (CRLF) -> shebang rusak
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh \
     && chown -R www-data:www-data /var/www/html \
     && mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
