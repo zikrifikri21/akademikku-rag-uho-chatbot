@@ -1,6 +1,6 @@
-import type { NavItem } from '@/types'
+import type { NavItem, SharedData } from '@/types'
 import { Link, usePage } from '@inertiajs/react'
-import { Lock, Palette, User as UserIcon } from 'lucide-react'
+import { BookOpen, Lock, Palette, User as UserIcon } from 'lucide-react'
 import { Heading } from '@/components/Heading'
 import { Separator } from '@/components/ui/separator'
 import AppLayout from '@/layouts/AppLayout'
@@ -28,7 +28,10 @@ const sidebarNavItems: NavItem[] = [
 ]
 
 export function SettingsLayout({ children }: SettingsLayoutProps) {
-  const page = usePage()
+  const page = usePage<SharedData>()
+  const navItems = page.props.auth.user?.is_admin
+    ? [...sidebarNavItems, { title: 'Pengetahuan AI', href: '/settings/knowledge', icon: BookOpen }]
+    : sidebarNavItems
 
   return (
     <AppLayout breadcrumbs={[{ title: 'Settings', href: '/settings/profile' }]}>
@@ -43,7 +46,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
         <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
           <aside className="w-full lg:w-1/5">
             <nav className="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1">
-              {sidebarNavItems.map(item => {
+              {navItems.map(item => {
                 const IconComp = item.icon
                 const isActive = page.url === item.href
 

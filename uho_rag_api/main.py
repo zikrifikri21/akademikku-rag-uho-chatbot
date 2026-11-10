@@ -23,11 +23,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import config
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from rag_engine import init_engine, jawab
+from rag_engine import init_engine, jawab, store
 from schemas import StreamRequest
 
 log = logging.getLogger("uho_rag")
@@ -77,10 +77,13 @@ def health():
 async def rag_stream(payload: StreamRequest, x_internal_api_key: Optional[str] = Header(default=None)):
     verifikasi_internal_key(x_internal_api_key)
 
+    if payload.versi and not any(v["no"] == payload.versi for v in store.manifest.get("versi", [])):
+        raise HTTPException(status_code=404, detail=f"Versi {payload.versi} tidak ada")
+
     def generate():
         try:
             riwayat = [{"role": m.role, "content": m.content} for m in payload.history[-config.MAX_RIWAYAT_DIPAKAI:]]
-            teks, sumber = jawab(payload.message, riwayat, fakultas=payload.fakultas, model=payload.model)
+            teks, sumber = jawab(payload.message, riwayat, fakultas=payload.fakultas, model=payload.model, versi=payload.versi)
             for potongan in potong_stream(teks):
                 yield event_line("text_delta", potongan)
             if sumber:
@@ -90,3 +93,48 @@ async def rag_stream(payload: StreamRequest, x_internal_api_key: Optional[str] =
             yield event_line("error", "Terjadi kesalahan pada layanan. Silakan coba lagi.")
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
+
+
+# ---------- Pengetahuan berversi (dipanggil dari halaman admin Laravel) ----------
+MAKS_PDF = 50 * 1024 * 1024
+
+
+@app.get("/api/knowledge")
+def knowledge_list(x_internal_api_key: Optional[str] = Header(default=None)):
+    verifikasi_internal_key(x_internal_api_key)
+    return store.manifest
+
+
+@app.post("/api/knowledge/upload")
+def knowledge_upload(
+    file: UploadFile = File(...),
+    title: str = Form(..., min_length=3, max_length=200),
+    fakultas: str = Form("UNIVERSITAS", max_length=50),
+    source: str = Form("", max_length=500),
+    catatan: str = Form("", max_length=500),
+    ganti_doc_id: str = Form("", max_length=32),
+    aktifkan: bool = Form(True),
+    x_internal_api_key: Optional[str] = Header(default=None),
+):
+    """Sinkron (def) -> FastAPI menjalankannya di threadpool, embedding tidak memblokir chat."""
+    verifikasi_internal_key(x_internal_api_key)
+    data = file.file.read(MAKS_PDF + 1)
+    if len(data) > MAKS_PDF or not data.startswith(b"%PDF"):
+        raise HTTPException(status_code=422, detail="File harus PDF dan maksimal 50 MB")
+    if ganti_doc_id and ganti_doc_id not in store.manifest["dokumen"]:
+        raise HTTPException(status_code=422, detail="Dokumen yang mau diganti tidak ada")
+    try:
+        return store.tambah_pdf(data, title.strip(), fakultas.strip().upper() or "UNIVERSITAS",
+                                source.strip() or f"upload:{file.filename}", catatan.strip(), ganti_doc_id or None, aktifkan)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@app.post("/api/knowledge/versi/{no}/aktifkan")
+def knowledge_aktifkan(no: int, x_internal_api_key: Optional[str] = Header(default=None)):
+    verifikasi_internal_key(x_internal_api_key)
+    try:
+        store.aktifkan(no)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Versi {no} tidak ada")
+    return {"aktif": no}

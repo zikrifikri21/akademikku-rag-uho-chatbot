@@ -33,7 +33,8 @@ class FakeVS:
 
     def similarity_search(self, q, k=15, filter=None):
         FakeVS.filters.append(filter)
-        ok = (lambda d: d.metadata["fakultas"] in filter["fakultas"]["$in"]) if filter else (lambda d: True)
+        syarat = (filter or {}).get("$and") or ([filter] if filter else [])
+        ok = lambda d: all(d.metadata.get(f) in v["$in"] for s in syarat for f, v in s.items())
         return [d for d in DOCS if ok(d)][:k]
 
 
@@ -121,6 +122,32 @@ def tes_endpoint():
         main.jawab = meledak
         ev = [json.loads(l) for l in c.post("/api/rag/stream", json=isi, headers=h).text.splitlines()]
         assert ev == [{"eventType": "error", "content": "Terjadi kesalahan pada layanan. Silakan coba lagi."}]   # detail tidak bocor
+
+
+def tes_versi_pengetahuan():
+    import pymupdf as fitz
+    import knowledge
+    pdf = fitz.open()
+    for isi in ["BAB I\nKETENTUAN UMUM\nPasal 1\n" + "Yudisium dilaksanakan tiap bulan.\n" * 30,
+                "Pasal 2\n" + "Cuti baru maksimal 4 semester.\n" * 30]:
+        pdf.new_page().insert_text((50, 72), isi)
+    ch = knowledge.chunk_pdf(pdf.tobytes(), "Perrek Baru 2026", "FT", "upload:x.pdf", "d1")
+    assert ch and ch[0][0].startswith("[Perrek Baru 2026 | BAB I | Pasal 1 | hal. 1]") and ch[-1][1]["halaman_akhir"] == 2
+    assert ch[-1][1]["pasal"] == "2" and all(m["doc_id"] == "d1" for _, m in ch)
+
+    pasang_store()
+    s = rag_engine.store
+    for d in DOCS:
+        d.metadata["doc_id"] = "base"
+    DOCS[1].metadata["doc_id"] = "d1"           # Panduan FT = upload
+    s.manifest = {"aktif": 1, "versi": [{"no": 1, "docs": ["base"]}, {"no": 2, "docs": ["base", "d1"]}], "dokumen": {}}
+    FakeVS.filters.clear()
+    assert {d.metadata["doc_id"] for d, _ in s.retrieve("cuti", ["cuti"], "FT")} == {"base"}   # versi aktif 1: upload belum ikut
+    assert FakeVS.filters[-1] == {"$and": [{"fakultas": {"$in": ["FT", "UNIVERSITAS"]}}, {"doc_id": {"$in": ["base"]}}]}
+    assert {d.metadata["doc_id"] for d, _ in s.retrieve("cuti", ["cuti"], "FT", versi=2)} == {"base", "d1"}
+    knowledge.tambah_versi(s.manifest, ["d1"], "x", aktifkan=True)
+    assert s.manifest["aktif"] == 3 and {d.metadata["doc_id"] for d, _ in s.retrieve("cuti", ["cuti"])} == {"d1"}
+    s.manifest = {}
 
 
 if __name__ == "__main__":

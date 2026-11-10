@@ -34,12 +34,12 @@ def _sumber_item(m: dict) -> dict:
     }
 
 
-def jawab(pertanyaan: str, riwayat: list, fakultas: Optional[str] = None, model: Optional[str] = None) -> tuple:
+def jawab(pertanyaan: str, riwayat: list, fakultas: Optional[str] = None, model: Optional[str] = None, versi: Optional[int] = None) -> tuple:
     """(teks, sumber). Kalau tidak ada jawaban yang didukung dokumen: (TIDAK_ADA, [])."""
     standalone = llm.tulis_ulang(pertanyaan, riwayat, model)
     queries = [pertanyaan] + ([standalone] if standalone != pertanyaan else [])
     rerank_q = standalone if riwayat else pertanyaan      # pertanyaan lanjutan ("terus gimana?") baru bermakna setelah ditulis ulang
-    hasil = [(d, s) for d, s in store.retrieve(rerank_q, queries, fakultas) if s >= config.MIN_RERANK_SCORE]
+    hasil = [(d, s) for d, s in store.retrieve(rerank_q, queries, fakultas, versi) if s >= config.MIN_RERANK_SCORE]
     print(f"[rag_engine] query={standalone!r} | skor tertinggi={hasil[0][1] if hasil else 0:.2f} | konteks={len(hasil)}")
     if not hasil:
         return config.TIDAK_ADA, []          # LLM tidak dipanggil -> tidak ada peluang berhalusinasi

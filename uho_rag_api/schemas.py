@@ -15,3 +15,4 @@ class StreamRequest(BaseModel):
     model: Optional[str] = Field(default=None, max_length=100)   # harus ada di ALLOWED_MODELS, kalau tidak dipakai model default
     history: list[ChatMessage] = Field(default_factory=list, max_length=40)
     fakultas: Optional[str] = Field(default=None, max_length=50)  # opsional: dokumen fakultas itu + dokumen UNIVERSITAS
+    versi: Optional[int] = Field(default=None, ge=1)  # opsional: uji versi pengetahuan tertentu (default: versi aktif)
