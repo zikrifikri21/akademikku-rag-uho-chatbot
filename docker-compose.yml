@@ -66,7 +66,8 @@ services:
       # true karena diakses lewat https (Traefik)
       - FORCE_HTTPS=${FORCE_HTTPS:-true}
       - DB_CONNECTION=sqlite
-      - DB_DATABASE=/var/www/html/database/database.sqlite
+      # Volume hanya untuk file sqlite: kalau di-mount ke database/ seluruhnya, migrasi baru dari image tertutup volume.
+      - DB_DATABASE=/var/www/html/database/data/database.sqlite
       - RAG_API_URL=http://rag-api:8001
       - RAG_API_KEY=${INTERNAL_API_KEY:?isi INTERNAL_API_KEY di .env}
       - SESSION_DRIVER=database
@@ -74,7 +75,7 @@ services:
       - QUEUE_CONNECTION=sync
       - LOG_CHANNEL=stderr
     volumes:
-      - sqlite_data:/var/www/html/database
+      - sqlite_data:/var/www/html/database/data
       - storage_data:/var/www/html/storage
     labels:
       - "traefik.enable=true"
